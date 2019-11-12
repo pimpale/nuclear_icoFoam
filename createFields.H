@@ -26,7 +26,73 @@ volVectorField U
     mesh
 );
 
+// TEMPERATURE STUFF
+
+Info<< "Reading field T\n" << endl;
+volScalarField T
+(
+    IOobject
+    (
+        "T",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh
+);
+
+dimensionedScalar DT
+(
+    transportProperties.lookup("DT")
+);
+
+// Neutron stuff
+
+// Thermal neutron flux
+Info<< "Reading field neuT \n" << endl;
+volScalarField nPhi
+(
+    IOobject
+    (
+        "neuT",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh
+);
+
+// Fast neutron flux
+Info<< "Reading field neuF \n" << endl;
+volScalarField nPhi
+(
+    IOobject
+    (
+        "neuT",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh
+);
+
+// Diffusivity of thermal neutrons
+dimensionedScalar DneuT
+(
+    transportProperties.lookup("DneuT")
+);
+
+// Diffusivity of fast neutrons
+dimensionedScalar DneuF
+(
+    transportProperties.lookup("DneuF")
+);
+
 #include "createPhi.H"
+
 
 
 label pRefCell = 0;

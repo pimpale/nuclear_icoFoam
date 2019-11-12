@@ -114,6 +114,46 @@ int main(int argc, char *argv[])
             while (piso.correct())
             {
                 #include "pEqn.H"
+
+                // These eqns are pretty short so we'll just put them right in the
+                // main file
+
+                // Temperature
+                fvScalarMatrix TEqn
+                (
+                    fvm::ddt(T)
+                  + fvm::div(phi, T)
+                  - fvm::laplacian(DT, T)
+                );
+
+                // TODO: while this works for now, i'd like to eventually
+                // make the thermal neutrons the same temp as the fluid
+                // thermal neutrons
+                // They get more neutrons from the decay of the fast neutron flux
+                // at their location
+                fvScalarMatrix neuTEqn
+                (
+                    fvm::ddt(neuT)
+                  + fvm::div(phi, neuT)
+                  - fvm::laplacian(DneuT, neuT)
+                );
+
+
+                // fast neutrons
+                // They slowly decay into thermal neutrons at a rate given
+                // We delete the term given earlier
+                fvScalarMatrix neuFEqn
+                (
+                    fvm::ddt(neuF)
+                  + fvm::div(phi, neuF)
+                  - fvm::laplacian(DneuF, neuF)
+                );
+
+                // Now solve these eqns
+                TEqn.solve();
+                neuTEqn.solve();
+                neuFEqn.solve();
+
             }
         }
 
