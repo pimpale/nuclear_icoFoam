@@ -1,3 +1,17 @@
+Info<< "Reading transportProperties\n" << endl;
+
+IOdictionary transportProperties
+(
+    IOobject
+    (
+        "transportProperties",
+        runTime.constant(),
+        mesh,
+        IOobject::MUST_READ_IF_MODIFIED,
+        IOobject::NO_WRITE
+    )
+);
+
 Info<< "Reading field p\n" << endl;
 volScalarField p
 (
@@ -51,7 +65,7 @@ dimensionedScalar DT
 
 // Thermal neutron flux
 Info<< "Reading field neuT \n" << endl;
-volScalarField nPhi
+volScalarField neuT
 (
     IOobject
     (
@@ -66,11 +80,11 @@ volScalarField nPhi
 
 // Fast neutron flux
 Info<< "Reading field neuF \n" << endl;
-volScalarField nPhi
+volScalarField neuF
 (
     IOobject
     (
-        "neuT",
+        "neuF",
         runTime.timeName(),
         mesh,
         IOobject::MUST_READ,
