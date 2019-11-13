@@ -56,10 +56,8 @@ volScalarField T
     mesh
 );
 
-dimensionedScalar DT
-(
-    transportProperties.lookup("DT")
-);
+// Technically it's diffusivity, but should work nonetheless
+dimensionedScalar DT ("DT", dimViscosity, transportProperties);
 
 // Neutron stuff
 
@@ -94,16 +92,11 @@ volScalarField neuF
 );
 
 // Diffusivity of thermal neutrons
-dimensionedScalar DneuT
-(
-    transportProperties.lookup("DneuT")
-);
+// Same deal as before, with the dimensions
+dimensionedScalar DneuT ("DneuT", dimViscosity, transportProperties);
 
 // Diffusivity of fast neutrons
-dimensionedScalar DneuF
-(
-    transportProperties.lookup("DneuF")
-);
+dimensionedScalar DneuF ("DneuF", dimViscosity, transportProperties);
 
 #include "createPhi.H"
 
