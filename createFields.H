@@ -19,12 +19,33 @@ dimensionedScalar nu
     transportProperties.lookup("nu")
 );
 
+dimensionedScalar nu
+(
+    "Dnv",
+    dimViscosity,
+    transportProperties.lookup("Dnv")
+);
+
 Info<< "Reading field p\n" << endl;
 volScalarField p
 (
     IOobject
     (
         "p",
+        runTime.timeName(),
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::AUTO_WRITE
+    ),
+    mesh
+);
+
+Info<< "Reading field nv\n" << endl;
+volScalarField nv
+(
+    IOobject
+    (
+        "nv",
         runTime.timeName(),
         mesh,
         IOobject::MUST_READ,
@@ -50,7 +71,6 @@ volVectorField U
 
 
 #include "createPhi.H"
-
 
 label pRefCell = 0;
 scalar pRefValue = 0.0;
