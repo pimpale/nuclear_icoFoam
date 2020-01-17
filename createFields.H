@@ -19,7 +19,7 @@ dimensionedScalar nu
     transportProperties.lookup("nu")
 );
 
-dimensionedScalar nu
+dimensionedScalar Dnv
 (
     "Dnv",
     dimViscosity,
