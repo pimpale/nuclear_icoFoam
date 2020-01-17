@@ -118,6 +118,7 @@ int main(int argc, char *argv[])
             fvm::ddt(nv)
             + fvm::div(phi, nv)
             - fvm::laplacian(Dnv, nv)
+            - nvMul*nv
         );
 
         nvEqn.solve();

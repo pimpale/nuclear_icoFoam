@@ -22,8 +22,15 @@ dimensionedScalar nu
 dimensionedScalar Dnv
 (
     "Dnv",
-    dimViscosity,
+    dimViscosity, // Diffusivity of neutron flux
     transportProperties.lookup("Dnv")
+);
+
+dimensionedScalar nvMul
+(
+    "nvMul",
+    dimless/dimTime, // The multiplier for the thing
+    transportProperties.lookup("nvMul")
 );
 
 Info<< "Reading field p\n" << endl;
