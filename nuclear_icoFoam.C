@@ -25,7 +25,7 @@ Application
     icoFoam
 
 Description
-    Transient solver for incompressible, laminar flow of Newtonian fluids.
+    Transient solver for incompressible, nuclear laminar flow of Newtonian fluids.
 
 \*---------------------------------------------------------------------------*/
 
@@ -35,9 +35,10 @@ Description
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[]) {
-#include "createMesh.H"
-#include "createTime.H"
+
 #include "setRootCaseLists.H"
+#include "createTime.H"
+#include "createMesh.H"
 
   pisoControl piso(mesh);
 
@@ -49,9 +50,10 @@ int main(int argc, char *argv[]) {
       IOobject("transportProperties", runTime.constant(), mesh,
                IOobject::MUST_READ_IF_MODIFIED, IOobject::NO_WRITE));
 
+  // How many neutrons an atom will release on average per fission event
   dimensionedScalar nu("nu", dimViscosity, transportProperties.lookup("nu"));
 
-  // dimensionedScalar
+  dimensionedScalar nMulFactor("nMulFactor", dimless, transportProperties.lookup("nMulFactor"));
 
   // Macroscopic nuclear absorption cross section
   dimensionedScalar sigmaA("sigmaA",
@@ -63,11 +65,15 @@ int main(int argc, char *argv[]) {
                            dimless / dimLength, // (m -1)
                            transportProperties.lookup("sigmaF"));
 
-
   // Macroscopic nuclear scatter cross section
   dimensionedScalar sigmaS("sigmaS",
                            dimless / dimLength, // (m -1)
                            transportProperties.lookup("sigmaS"));
+
+
+  // Here we calculate the neutron diffusion constant
+  // https://www.nuclear-power.net/nuclear-power/reactor-physics/neutron-diffusion-theory/diffusion-coefficient/
+  dimensionedScalar nD= 1/(3*sigmaS);
 
   Info << "Reading field p\n" << endl;
   volScalarField p(IOobject("p", runTime.timeName(), mesh, IOobject::MUST_READ,
@@ -75,7 +81,7 @@ int main(int argc, char *argv[]) {
                    mesh);
 
   Info << "Reading field nPhi\n" << endl;
-  volScalarField nv(IOobject("nPhi", runTime.timeName(), mesh,
+  volScalarField nPhi(IOobject("nPhi", runTime.timeName(), mesh,
                              IOobject::MUST_READ, IOobject::AUTO_WRITE),
                     mesh);
 
@@ -147,10 +153,15 @@ int main(int argc, char *argv[]) {
     }
 
     // add these lines...
-    fvScalarMatrix nvEqn(fvm::ddt(nv) + fvm::div(phi, nv) -
-                         fvm::laplacian(Dnv, nv) - nvMul * nv);
+    fvScalarMatrix nPhiEqn(
+        fvm::ddt(nPhi) // the result
+        + fvm::div(phi, nPhi) // neutron convection
+        - fvm::laplacian(nD, nPhi) // neutron diffusion
+        - sigmaF * nPhi * nMulFactor // Neutron fission 
+        + sigmaA * nPhi // neutron absorption
+        );
 
-    nvEqn.solve();
+    nPhiEqn.solve();
     // done adding lines...
 
     runTime.write();
