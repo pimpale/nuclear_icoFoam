@@ -34,107 +34,121 @@ Description
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-int main(int argc, char *argv[])
-{
-    #include "setRootCaseLists.H"
-    #include "createTime.H"
-    #include "createMesh.H"
+int main(int argc, char *argv[]) {
 
-    pisoControl piso(mesh);
+#include "setRootCaseLists.H"
+#include "createTime.H"
+#include "createMesh.H"
 
-    #include "createFields.H"
-    #include "initContinuityErrs.H"
+  pisoControl piso(mesh);
 
-    // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+  Info << "Reading transportProperties\n" << endl;
 
-    Info<< "\nStarting time loop\n" << endl;
+  IOdictionary transportProperties(
+      IOobject("transportProperties", runTime.constant(), mesh,
+               IOobject::MUST_READ_IF_MODIFIED, IOobject::NO_WRITE));
 
-    while (runTime.loop())
-    {
-        Info<< "Time = " << runTime.timeName() << nl << endl;
+  dimensionedScalar nu("nu", dimViscosity, transportProperties.lookup("nu"));
 
-        #include "CourantNo.H"
+  dimensionedScalar Dnv("Dnv",
+                        dimViscosity, // Diffusivity of neutron flux
+                        transportProperties.lookup("Dnv"));
 
-        // Momentum predictor
+  dimensionedScalar nvMul("nvMul",
+                          dimless / dimTime, // The multiplier for the thing
+                          transportProperties.lookup("nvMul"));
 
-        fvVectorMatrix UEqn
-        (
-            fvm::ddt(U)
-          + fvm::div(phi, U)
-          - fvm::laplacian(nu, U)
-        );
+  Info << "Reading field p\n" << endl;
+  volScalarField p(IOobject("p", runTime.timeName(), mesh, IOobject::MUST_READ,
+                            IOobject::AUTO_WRITE),
+                   mesh);
 
-        if (piso.momentumPredictor())
-        {
-            solve(UEqn == -fvc::grad(p));
-        }
+  Info << "Reading field nv\n" << endl;
+  volScalarField nv(IOobject("nv", runTime.timeName(), mesh,
+                             IOobject::MUST_READ, IOobject::AUTO_WRITE),
+                    mesh);
 
-        // --- PISO loop
-        while (piso.correct())
-        {
-            volScalarField rAU(1.0/UEqn.A());
-            volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U, p));
-            surfaceScalarField phiHbyA
-            (
-                "phiHbyA",
-                fvc::flux(HbyA)
-              + fvc::interpolate(rAU)*fvc::ddtCorr(U, phi)
-            );
+  Info << "Reading field U\n" << endl;
+  volVectorField U(IOobject("U", runTime.timeName(), mesh, IOobject::MUST_READ,
+                            IOobject::AUTO_WRITE),
+                   mesh);
 
-            adjustPhi(phiHbyA, U, p);
+#include "createPhi.H"
 
-            // Update the pressure BCs to ensure flux consistency
-            constrainPressure(p, U, phiHbyA, rAU);
+  label pRefCell = 0;
+  scalar pRefValue = 0.0;
+  setRefCell(p, mesh.solutionDict().subDict("PISO"), pRefCell, pRefValue);
+  mesh.setFluxRequired(p.name());
+#include "initContinuityErrs.H"
 
-            // Non-orthogonal pressure corrector loop
-            while (piso.correctNonOrthogonal())
-            {
-                // Pressure corrector
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-                fvScalarMatrix pEqn
-                (
-                    fvm::laplacian(rAU, p) == fvc::div(phiHbyA)
-                );
+  Info << "\nStarting time loop\n" << endl;
 
-                pEqn.setReference(pRefCell, pRefValue);
+  while (runTime.loop()) {
+    Info << "Time = " << runTime.timeName() << nl << endl;
 
-                pEqn.solve();
+#include "CourantNo.H"
 
-                if (piso.finalNonOrthogonalIter())
-                {
-                    phi = phiHbyA - pEqn.flux();
-                }
-            }
+    // Momentum predictor
 
-            #include "continuityErrs.H"
+    fvVectorMatrix UEqn(fvm::ddt(U) + fvm::div(phi, U) - fvm::laplacian(nu, U));
 
-            U = HbyA - rAU*fvc::grad(p);
-            U.correctBoundaryConditions();
-        }
-
-//add these lines...
-        fvScalarMatrix nvEqn
-        (
-            fvm::ddt(nv)
-            + fvm::div(phi, nv)
-            - fvm::laplacian(Dnv, nv)
-            - nvMul*nv
-        );
-
-        nvEqn.solve();
-//done adding lines...
-
-        runTime.write();
-
-        Info<< "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
-            << "  ClockTime = " << runTime.elapsedClockTime() << " s"
-            << nl << endl;
+    if (piso.momentumPredictor()) {
+      solve(UEqn == -fvc::grad(p));
     }
 
-    Info<< "End\n" << endl;
+    // --- PISO loop
+    while (piso.correct()) {
+      volScalarField rAU(1.0 / UEqn.A());
+      volVectorField HbyA(constrainHbyA(rAU * UEqn.H(), U, p));
+      surfaceScalarField phiHbyA("phiHbyA",
+                                 fvc::flux(HbyA) + fvc::interpolate(rAU) *
+                                                       fvc::ddtCorr(U, phi));
 
-    return 0;
+      adjustPhi(phiHbyA, U, p);
+
+      // Update the pressure BCs to ensure flux consistency
+      constrainPressure(p, U, phiHbyA, rAU);
+
+      // Non-orthogonal pressure corrector loop
+      while (piso.correctNonOrthogonal()) {
+        // Pressure corrector
+
+        fvScalarMatrix pEqn(fvm::laplacian(rAU, p) == fvc::div(phiHbyA));
+
+        pEqn.setReference(pRefCell, pRefValue);
+
+        pEqn.solve();
+
+        if (piso.finalNonOrthogonalIter()) {
+          phi = phiHbyA - pEqn.flux();
+        }
+      }
+
+#include "continuityErrs.H"
+
+      U = HbyA - rAU * fvc::grad(p);
+      U.correctBoundaryConditions();
+    }
+
+    // add these lines...
+    fvScalarMatrix nvEqn(fvm::ddt(nv) + fvm::div(phi, nv) -
+                         fvm::laplacian(Dnv, nv) - nvMul * nv);
+
+    nvEqn.solve();
+    // done adding lines...
+
+    runTime.write();
+
+    Info << "ExecutionTime = " << runTime.elapsedCpuTime() << " s"
+         << "  ClockTime = " << runTime.elapsedClockTime() << " s" << nl
+         << endl;
+  }
+
+  Info << "End\n" << endl;
+
+  return 0;
 }
-
 
 // ************************************************************************* //
