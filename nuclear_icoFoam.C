@@ -25,7 +25,7 @@ Application
     icoFoam
 
 Description
-    Transient solver for incompressible, laminar flow of Newtonian fluids.
+    Transient solver for incompressible, nuclear laminar flow of Newtonian fluids.
 
 \*---------------------------------------------------------------------------*/
 
@@ -150,5 +150,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-
-// ************************************************************************* //
