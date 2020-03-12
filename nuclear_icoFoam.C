@@ -36,9 +36,11 @@ Description
 
 int main(int argc, char *argv[]) {
 
+// clang-format off
 #include "setRootCaseLists.H"
 #include "createTime.H"
 #include "createMesh.H"
+// clang-format on
 
   pisoControl piso(mesh);
 
@@ -48,28 +50,75 @@ int main(int argc, char *argv[]) {
       IOobject("transportProperties", runTime.constant(), mesh,
                IOobject::MUST_READ_IF_MODIFIED, IOobject::NO_WRITE));
 
+  // Water viscosity
   dimensionedScalar nu("nu", dimViscosity, transportProperties.lookup("nu"));
 
-  dimensionedScalar Dnv("Dnv",
-                        dimViscosity, // Diffusivity of neutron flux
-                        transportProperties.lookup("Dnv"));
+  // Thermal diffusivity
+  dimensionedScalar DT("DT", dimViscosity, transportProperties.lookup("DT"));
 
-  dimensionedScalar nvMul("nvMul",
-                          dimless / dimTime, // The multiplier for the thing
-                          transportProperties.lookup("nvMul"));
+  // Diffusivity of thermal neutron concentration
+  dimensionedScalar Dnv_t("Dnv_t",
+                        dimViscosity,
+                        transportProperties.lookup("Dnv_t"));
 
+  // Diffusivity of fast neutron concentration
+  dimensionedScalar Dnv_f("Dnv_f",
+                        dimViscosity,
+                        transportProperties.lookup("Dnv_f"));
+
+  // Neutron multiplier constant for thermal neutrons
+  dimensionedScalar nvMul_t("nvMul_t",
+                          dimless / dimTime,
+                          transportProperties.lookup("nvMul_t"));
+
+  // Neutron multiplier constant for fast neutrons
+  dimensionedScalar nvMul_f("nvMul_f",
+                          dimless / dimTime,
+                          transportProperties.lookup("nvMul_f"));
+
+  // Neutron heating from thermal neutrons
+  dimensionedScalar gammaT_t("gammaT_t",
+                          dimless / dimTime,
+                          transportProperties.lookup("gammaT_t"));
+
+  // Neutron heating from fast neutrons
+  dimensionedScalar gammaT_f("gammaT_f",
+                          dimless / dimTime,
+                          transportProperties.lookup("gammaT_f"));
+
+  // Fast neutron downscattering constant
+  dimensionedScalar gamma_f("gamma_f",
+                          dimless / dimTime,
+                          transportProperties.lookup("gamma_f"));
+
+  // Fast neutron concentration
+  Info << "Reading field nv_f\n" << endl;
+  volScalarField nv_f(IOobject("nv_f", runTime.timeName(), mesh,
+                             IOobject::MUST_READ, IOobject::AUTO_WRITE),
+                    mesh);
+
+  // Thermal neutron neutron concentration 
+  Info << "Reading field nv_t\n" << endl;
+  volScalarField nv_t(IOobject("nv_t", runTime.timeName(), mesh,
+                             IOobject::MUST_READ, IOobject::AUTO_WRITE),
+                    mesh);
+
+  // Fluid Pressure
   Info << "Reading field p\n" << endl;
   volScalarField p(IOobject("p", runTime.timeName(), mesh, IOobject::MUST_READ,
                             IOobject::AUTO_WRITE),
                    mesh);
 
-  Info << "Reading field nv\n" << endl;
-  volScalarField nv(IOobject("nv", runTime.timeName(), mesh,
-                             IOobject::MUST_READ, IOobject::AUTO_WRITE),
-                    mesh);
 
+  // Fluid velocity
   Info << "Reading field U\n" << endl;
   volVectorField U(IOobject("U", runTime.timeName(), mesh, IOobject::MUST_READ,
+                            IOobject::AUTO_WRITE),
+                   mesh);
+
+  // Temperature
+  Info << "Reading field T\n" << endl;
+  volScalarField T(IOobject("T", runTime.timeName(), mesh, IOobject::MUST_READ,
                             IOobject::AUTO_WRITE),
                    mesh);
 
@@ -132,12 +181,35 @@ int main(int argc, char *argv[]) {
       U.correctBoundaryConditions();
     }
 
-    // add these lines...
-    fvScalarMatrix nvEqn(fvm::ddt(nv) + fvm::div(phi, nv) -
-                         fvm::laplacian(Dnv, nv) - nvMul * nv);
+    // clang-format off
+    fvScalarMatrix nvEqn_t(
+          fvm::ddt(nv_t) // over time
+        + fvm::div(phi, nv_t) // convection
+        - fvm::laplacian(Dnv_t, nv_t) // diffusion
+        - nvMul_t * nv_t // fission
+        - gamma_f * nv_f // downscattering
+    );
+    nvEqn_t.solve();
 
-    nvEqn.solve();
-    // done adding lines...
+    fvScalarMatrix nvEqn_f(
+          fvm::ddt(nv_f)     // over time
+        + fvm::div(phi, nv_f) // convection
+        - fvm::laplacian(Dnv_f, nv_f) // diffusion
+        - nvMul_f * nv_f // fission
+        + gamma_f * nv_f // downscattering
+      );
+    nvEqn_f.solve();
+
+    fvScalarMatrix TEqn(
+          fvm::ddt(T) // over time
+        + fvm::div(phi, T) // convection
+        - fvm::laplacian(DT, T) // diffusion
+        + gammaT_t * nv_t // thermal neutron heating
+        + gammaT_f * nv_f // fast neutron heating
+    );
+    TEqn.solve();
+
+    // clang-format on
 
     runTime.write();
 
